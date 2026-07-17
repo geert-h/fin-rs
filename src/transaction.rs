@@ -5,6 +5,8 @@ use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::classification::TransactionKind;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Transaction {
     /// The unique identifier of a transaction
@@ -17,6 +19,8 @@ pub struct Transaction {
     /// The format is stored as an integer to make sure no precision is lost
     /// As an example, 20 euros is stored as 2000
     pub amount: i64,
+
+    pub kind: Option<TransactionKind>,
 }
 
 #[derive(Debug)]

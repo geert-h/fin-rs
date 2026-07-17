@@ -51,6 +51,7 @@ impl TransactionsParser for IngParser {
                 name: record.name_description,
                 trans_type,
                 amount: record.amount,
+                kind: None,
             })
         }
 

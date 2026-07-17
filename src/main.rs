@@ -5,8 +5,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::parser::{TransactionsParser, ing::IngParser};
+use crate::{
+    classification::Classifier,
+    parser::{TransactionsParser, ing::IngParser},
+    store::TransactionStore,
+};
 
+mod classification;
 mod parser;
 mod store;
 mod transaction;
@@ -15,11 +20,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let path: PathBuf = get_first_arg()?.into();
     let path = Path::new(&path);
 
-    let new_transactions = IngParser::parse(path)?;
+    // Parse the new transactions
+    let mut transactions = IngParser::parse(path)?;
 
-    let storage_path = "transactions/store.jsonl".to_string();
-    let storage_path = Path::new(&storage_path);
-    store::store(storage_path, new_transactions)?;
+    // Classify the transactions based on defined rules
+    let classifier = Classifier::new(Path::new("transactions/classification.jsonl"))?;
+    for t in &mut transactions {
+        classifier.classify_transaction(t);
+        if let Some(kind) = t.kind {
+            println!("{} -> {:?} / {:?}", t.name, kind.category(), kind,);
+        }
+    }
+
+    let store = TransactionStore::new("transactions/store.jsonl");
+    // Write them to file
+    store.store(transactions)?;
 
     Ok(())
 }

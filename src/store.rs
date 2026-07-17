@@ -3,57 +3,90 @@ use std::{
     error::Error,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
-    path::Path,
+    path::PathBuf,
 };
 
 use uuid::Uuid;
 
 use crate::transaction::Transaction;
 
-pub fn store(path: &Path, transactions: Vec<Transaction>) -> Result<(), Box<dyn Error>> {
-    let stored = read_transactions(path)?;
-    let candidate_count = transactions.len();
-    let new_transactions = prune_existing_transactions(stored, transactions);
-
-    println!(
-        "storing {} new transactions. {} were duplicate",
-        new_transactions.len(),
-        candidate_count - new_transactions.len(),
-    );
-
-    append_transactions(path, new_transactions)?;
-
-    println!(
-        "transactions succesfully written to {}",
-        path.to_string_lossy()
-    );
-
-    Ok(())
+pub struct TransactionStore {
+    path: PathBuf,
 }
 
-fn read_transactions(path: &Path) -> Result<Vec<Transaction>, Box<dyn Error>> {
-    if !path.exists() {
-        return Ok(Vec::new());
+impl TransactionStore {
+    pub fn new(path: impl Into<PathBuf>) -> TransactionStore {
+        Self { path: path.into() }
     }
 
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let mut transactions = Vec::new();
+    pub fn store(&self, transactions: Vec<Transaction>) -> Result<(), Box<dyn Error>> {
+        let stored = self.read_transactions()?;
+        let candidate_count = transactions.len();
+        let new_transactions = prune_existing_transactions(stored, transactions);
 
-    for (line_number, line) in reader.lines().enumerate() {
-        let line = line?;
+        println!(
+            "storing {} new transactions. {} were duplicate",
+            new_transactions.len(),
+            candidate_count - new_transactions.len(),
+        );
 
-        if line.trim().is_empty() {
-            continue;
+        self.append_transactions(new_transactions)?;
+
+        println!(
+            "transactions succesfully written to {}",
+            self.path.to_string_lossy()
+        );
+
+        Ok(())
+    }
+
+    fn read_transactions(&self) -> Result<Vec<Transaction>, Box<dyn Error>> {
+        if !self.path.exists() {
+            return Ok(Vec::new());
         }
 
-        let transaction = serde_json::from_str::<Transaction>(&line)
-            .map_err(|err| format!("invalid transaction on line {}: {}", line_number + 1, err))?;
+        let file = File::open(&self.path)?;
+        let reader = BufReader::new(file);
+        let mut transactions = Vec::new();
 
-        transactions.push(transaction);
+        for (line_number, line) in reader.lines().enumerate() {
+            let line = line?;
+
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            let transaction = serde_json::from_str::<Transaction>(&line).map_err(|err| {
+                format!("invalid transaction on line {}: {}", line_number + 1, err)
+            })?;
+
+            transactions.push(transaction);
+        }
+
+        Ok(transactions)
     }
 
-    Ok(transactions)
+    fn append_transactions(&self, transactions: Vec<Transaction>) -> Result<(), Box<dyn Error>> {
+        if transactions.is_empty() {
+            return Ok(());
+        }
+
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)?;
+
+        let mut writer = BufWriter::new(file);
+
+        for t in transactions {
+            serde_json::to_writer(&mut writer, &t)?;
+            writer.write_all(b"\n")?;
+        }
+
+        writer.flush()?;
+
+        Ok(())
+    }
 }
 
 /// Takes the current stored transactions and the new transactions.
@@ -65,23 +98,4 @@ fn prune_existing_transactions(
     let mut known_ids: HashSet<Uuid> = stored.iter().map(|t| t.id).collect();
 
     new.into_iter().filter(|t| known_ids.insert(t.id)).collect()
-}
-
-fn append_transactions(path: &Path, transactions: Vec<Transaction>) -> Result<(), Box<dyn Error>> {
-    if transactions.is_empty() {
-        return Ok(());
-    }
-
-    let file = OpenOptions::new().create(true).append(true).open(path)?;
-
-    let mut writer = BufWriter::new(file);
-
-    for t in transactions {
-        serde_json::to_writer(&mut writer, &t)?;
-        writer.write_all(b"\n")?;
-    }
-
-    writer.flush()?;
-
-    Ok(())
 }
