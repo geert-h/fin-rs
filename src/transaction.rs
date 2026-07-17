@@ -2,8 +2,10 @@ use core::fmt;
 use std::{error::Error, fmt::Display, str::FromStr};
 
 use chrono::{DateTime, Local};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Transaction {
     /// The unique identifier of a transaction
     pub id: Uuid,
@@ -44,7 +46,7 @@ impl FromStr for TransactionType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TransactionType {
     Debit,
     Credit,
