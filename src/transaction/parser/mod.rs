@@ -1,6 +1,6 @@
 use std::{error::Error, path::Path};
 
-use crate::transaction::Transaction;
+use crate::transaction::model::Transaction;
 
 pub mod ing;
 

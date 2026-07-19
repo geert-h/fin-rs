@@ -5,7 +5,7 @@ use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::classification::TransactionKind;
+use crate::classification::model::TransactionKind;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Transaction {

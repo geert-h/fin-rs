@@ -5,8 +5,8 @@ use serde::{Deserialize, Deserializer};
 use uuid::{Uuid, uuid};
 
 use crate::{
-    parser::TransactionsParser,
-    transaction::{Transaction, TransactionType},
+    TransactionsParser,
+    transaction::model::{Transaction, TransactionType},
 };
 
 pub struct IngParser;

@@ -1,47 +1,38 @@
-use std::{
-    env::args_os,
-    error::Error,
-    ffi::OsString,
-    path::{Path, PathBuf},
-};
+use std::{env::args_os, error::Error, ffi::OsString, path::PathBuf};
 
 use crate::{
-    classification::Classifier,
-    parser::{TransactionsParser, ing::IngParser},
-    store::TransactionStore,
+    classification::handler::ClassificationHandler,
+    import::handler::ImportHandler,
+    transaction::{
+        handler::Transactionhandler,
+        parser::{TransactionsParser, ing::IngParser},
+        store::TransactionStore,
+    },
 };
 
 mod classification;
-mod parser;
-mod store;
+mod import;
 mod transaction;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let path: PathBuf = get_first_arg()?.into();
-    let path = Path::new(&path);
+    let import_path: PathBuf = get_first_arg()?.into();
 
-    // Parse the new transactions
-    let mut transactions = IngParser::parse(path)?;
+    let transaction_store = TransactionStore::new("transactions/store.jsonl");
 
-    // Classify the transactions based on defined rules
-    let classifier = Classifier::from_file(Path::new("transactions/classification.jsonl"))?;
-    for t in &mut transactions {
-        classifier.classify_transaction(t);
-        if let Some(kind) = t.kind {
-            println!("{} -> {:?} / {:?}", t.name, kind.category(), kind,);
-        }
-    }
+    let transaction_handler = Transactionhandler::new(transaction_store);
 
-    let c = transactions.iter().filter(|t| t.kind.is_some()).count();
-    println!(
-        "classified: {}\nunclassified: {}",
-        c,
-        transactions.len() - c
-    );
+    let classification_handler =
+        ClassificationHandler::from_file("transactions/classification.jsonl".into())?;
 
-    let store = TransactionStore::new("transactions/store.jsonl");
-    // Write them to file
-    store.store(transactions)?;
+    let import_handler = ImportHandler::new(&transaction_handler, &classification_handler);
+
+    let result = import_handler.import::<IngParser>(&import_path)?;
+
+    println!("parsed: {}", result.parsed);
+    println!("added: {}", result.added);
+    println!("duplicates: {}", result.duplicates);
+    println!("classified: {}", result.classified);
+    println!("unclassified: {}", result.unclassified);
 
     Ok(())
 }
