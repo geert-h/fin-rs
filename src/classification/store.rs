@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    fs::{File, OpenOptions},
+    fs::File,
     io::{BufRead, BufReader, BufWriter, Write},
     path::Path,
 };
@@ -42,13 +42,15 @@ pub(crate) fn read_rules(path: &Path) -> Result<Vec<ClassificationRule>, Box<dyn
 /// Appends new classification rules to the rule file.
 ///
 /// Currently this is not used because the functionality for adding new rules is not there yet.
-fn append_rules(path: &Path, rules: Vec<ClassificationRule>) -> Result<(), Box<dyn Error>> {
+pub(crate) fn write_rules(
+    path: &Path,
+    rules: Vec<ClassificationRule>,
+) -> Result<(), Box<dyn Error>> {
     if rules.is_empty() {
         return Ok(());
     }
 
-    let file = OpenOptions::new().create(true).append(true).open(path)?;
-
+    let file = File::create(&path)?;
     let mut writer = BufWriter::new(file);
 
     for t in rules {

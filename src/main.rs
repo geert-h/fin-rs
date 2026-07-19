@@ -24,13 +24,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut transactions = IngParser::parse(path)?;
 
     // Classify the transactions based on defined rules
-    let classifier = Classifier::new(Path::new("transactions/classification.jsonl"))?;
+    let classifier = Classifier::from_file(Path::new("transactions/classification.jsonl"))?;
     for t in &mut transactions {
         classifier.classify_transaction(t);
         if let Some(kind) = t.kind {
             println!("{} -> {:?} / {:?}", t.name, kind.category(), kind,);
         }
     }
+
+    let c = transactions.iter().filter(|t| t.kind.is_some()).count();
+    println!(
+        "classified: {}\nunclassified: {}",
+        c,
+        transactions.len() - c
+    );
 
     let store = TransactionStore::new("transactions/store.jsonl");
     // Write them to file

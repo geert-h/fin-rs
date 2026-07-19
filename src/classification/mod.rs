@@ -12,10 +12,20 @@ pub struct Classifier {
 }
 
 impl Classifier {
-    pub fn new(path: &Path) -> Result<Self, Box<dyn Error>> {
+    pub fn from_file(path: &Path) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             rules: store::read_rules(path)?,
         })
+    }
+
+    #[allow(dead_code)]
+    pub fn add_rule(&mut self, rule: ClassificationRule) {
+        self.rules.push(rule);
+    }
+
+    #[allow(dead_code)]
+    pub fn to_file(&self, path: &Path) -> Result<(), Box<dyn Error>> {
+        store::write_rules(path, self.rules.clone())
     }
 
     pub fn classify_transaction(&self, t: &mut Transaction) {
