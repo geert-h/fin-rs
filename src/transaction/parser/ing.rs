@@ -4,9 +4,9 @@ use chrono::{Local, NaiveDate, NaiveDateTime, TimeZone};
 use serde::{Deserialize, Deserializer};
 use uuid::{Uuid, uuid};
 
-use crate::{
-    TransactionsParser,
-    transaction::model::{Transaction, TransactionType},
+use crate::transaction::{
+    model::{Transaction, TransactionType},
+    parser::TransactionsParser,
 };
 
 pub struct IngParser;

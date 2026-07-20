@@ -1,47 +1,92 @@
-use std::{env::args_os, error::Error, ffi::OsString, path::PathBuf};
-
-use crate::{
-    classification::handler::ClassificationHandler,
-    import::handler::ImportHandler,
-    transaction::{
-        handler::Transactionhandler,
-        parser::{TransactionsParser, ing::IngParser},
-        store::TransactionStore,
-    },
-};
-
+mod app;
 mod classification;
 mod import;
 mod transaction;
+mod ui;
+
+use std::{error::Error, io, time::Duration};
+
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEventKind},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+};
+use ratatui::{Terminal, backend::CrosstermBackend};
+
+use crate::{app::App, transaction::store::TransactionStore};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let import_path: PathBuf = get_first_arg()?.into();
+    let store = TransactionStore::new("transactions/store.jsonl");
+    let transactions = store.read_all()?;
 
-    let transaction_store = TransactionStore::new("transactions/store.jsonl");
+    let mut app = App::new(transactions);
 
-    let transaction_handler = Transactionhandler::new(transaction_store);
+    let mut terminal = initialize_terminal()?;
+    let result = run_app(&mut terminal, &mut app);
+    restore_terminal(&mut terminal)?;
 
-    let classification_handler =
-        ClassificationHandler::from_file("transactions/classification.jsonl".into())?;
+    result
+}
 
-    let import_handler = ImportHandler::new(&transaction_handler, &classification_handler);
+fn run_app(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    app: &mut App,
+) -> Result<(), Box<dyn Error>> {
+    while !app.should_quit {
+        terminal.draw(|frame| ui::render(frame, app))?;
 
-    let result = import_handler.import::<IngParser>(&import_path)?;
+        if !event::poll(Duration::from_millis(100))? {
+            continue;
+        }
 
-    println!("parsed: {}", result.parsed);
-    println!("added: {}", result.added);
-    println!("duplicates: {}", result.duplicates);
-    println!("classified: {}", result.classified);
-    println!("unclassified: {}", result.unclassified);
+        let Event::Key(key) = event::read()? else {
+            continue;
+        };
+
+        // Crossterm can report key press, repeat, and release events.
+        // Only respond to presses and repeats.
+        if key.kind == KeyEventKind::Release {
+            continue;
+        }
+
+        match key.code {
+            KeyCode::Char('q') => app.quit(),
+
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.next_transaction();
+            }
+
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.previous_transaction();
+            }
+
+            _ => {}
+        }
+    }
 
     Ok(())
 }
 
-/// Returns the first positional argument sent to this process. If there are no
-/// positional arguments, then this returns an error.
-fn get_first_arg() -> Result<OsString, Box<dyn Error>> {
-    match args_os().nth(1) {
-        None => Err(From::from("expected 1 argument, but got none")),
-        Some(file_path) => Ok(file_path),
-    }
+fn initialize_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>, Box<dyn Error>> {
+    enable_raw_mode()?;
+
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+
+    let backend = CrosstermBackend::new(stdout);
+    let terminal = Terminal::new(backend)?;
+
+    Ok(terminal)
+}
+
+fn restore_terminal(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) -> Result<(), Box<dyn Error>> {
+    disable_raw_mode()?;
+
+    execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
+
+    terminal.show_cursor()?;
+
+    Ok(())
 }
